@@ -1,0 +1,20 @@
+# ── values-local.yaml — Local Kubernetes overrides ──
+global:
+  imageRegistry: ""
+  imagePullPolicy: IfNotPresent
+  storageClass: ""   # Uses cluster default (local-path on k3s, standard on kind)
+
+woocommerce:
+  image:
+    repository: urumi/wordpress
+    tag: v2
+
+ingress:
+  storeDomain: store.127.0.0.1.nip.io
+  dashboardDomain: dashboard.127.0.0.1.nip.io
+  tls: false
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+
+secrets:
+  geminiApiKey: ""  # Set your Gemini API key here for local testing

@@ -1,0 +1,110 @@
+{{- if .Values.woocommerce.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: woocommerce-pvc
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with (coalesce .Values.woocommerce.persistence.storageClass .Values.global.storageClass) }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.woocommerce.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: woocommerce
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+    app: woocommerce
+spec:
+  replicas: {{ .Values.woocommerce.replicaCount }}
+  selector:
+    matchLabels:
+      app: woocommerce
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: woocommerce
+    spec:
+      initContainers:
+      - name: wait-for-db
+        image: busybox:1.36
+        command: [sh, -c, "until nc -z mariadb 3306; do echo 'Waiting for MariaDB...'; sleep 3; done"]
+      containers:
+      - name: wordpress
+        image: {{ .Values.woocommerce.image.repository }}:{{ .Values.woocommerce.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        command: ["/bin/bash"]
+        args: ["/usr/local/bin/docker-entrypoint.sh", "apache2-foreground"]
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: mariadb
+        - name: WORDPRESS_DB_NAME
+          value: {{ .Values.mariadb.auth.database }}
+        - name: WORDPRESS_DB_USER
+          value: {{ .Values.mariadb.auth.username }}
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: urumi-db-secret
+              key: user-password
+        - name: WORDPRESS_TABLE_PREFIX
+          value: {{ .Values.woocommerce.env.tablePrefix }}
+        - name: WORDPRESS_DEBUG
+          value: {{ .Values.woocommerce.env.debugMode | quote }}
+        - name: WORDPRESS_STORE_URL
+          value: "http://{{ .Values.ingress.storeDomain }}"
+        - name: WORDPRESS_CONFIG_EXTRA
+          value: |
+            define('WP_HOME', 'http://{{ .Values.ingress.storeDomain }}');
+            define('WP_SITEURL', 'http://{{ .Values.ingress.storeDomain }}');
+            define('FS_METHOD', 'direct');
+        volumeMounts:
+        - name: wp-content
+          mountPath: /var/www/html/wp-content
+        resources: {{- toYaml .Values.woocommerce.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /wp-login.php
+            port: 80
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /wp-login.php
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: wp-content
+        persistentVolumeClaim:
+          claimName: woocommerce-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: woocommerce
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: woocommerce
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+{{- end }}

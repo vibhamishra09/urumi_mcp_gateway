@@ -1,0 +1,22 @@
+{
+  "name": "urumi-gateway",
+  "version": "1.0.0",
+  "description": "MCP Gateway backend — registers upstream MCP servers and exposes them as one endpoint",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "migrate": "node src/db/migrate.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.3",
+    "zod": "^3.23.8"
+  }
+}

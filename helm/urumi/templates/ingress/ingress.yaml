@@ -1,0 +1,48 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: urumi-ingress
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+  {{- if .Values.ingress.tlsSecretStore }}
+  - hosts:
+    - {{ .Values.ingress.storeDomain }}
+    secretName: {{ .Values.ingress.tlsSecretStore }}
+  {{- end }}
+  {{- if .Values.ingress.tlsSecretDashboard }}
+  - hosts:
+    - {{ .Values.ingress.dashboardDomain }}
+    secretName: {{ .Values.ingress.tlsSecretDashboard }}
+  {{- end }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.ingress.storeDomain }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: woocommerce
+            port:
+              number: 80
+  - host: {{ .Values.ingress.dashboardDomain }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gateway-frontend
+            port:
+              number: 80
+{{- end }}

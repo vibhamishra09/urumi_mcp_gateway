@@ -1,0 +1,55 @@
+{{- if .Values.gatewayFrontend.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-frontend
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+    app: gateway-frontend
+spec:
+  replicas: {{ .Values.gatewayFrontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: gateway-frontend
+  template:
+    metadata:
+      labels:
+        app: gateway-frontend
+    spec:
+      containers:
+      - name: gateway-frontend
+        image: {{ .Values.gatewayFrontend.image.repository }}:{{ .Values.gatewayFrontend.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.gatewayFrontend.port }}
+          name: http
+        resources: {{- toYaml .Values.gatewayFrontend.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.gatewayFrontend.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.gatewayFrontend.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-frontend
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: gateway-frontend
+  ports:
+  - port: 80
+    targetPort: {{ .Values.gatewayFrontend.port }}
+    name: http
+{{- end }}

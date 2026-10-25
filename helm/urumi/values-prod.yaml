@@ -1,0 +1,51 @@
+# ── values-prod.yaml — k3s/production overrides ──
+global:
+  imageRegistry: "your-registry.example.com"  # Replace with your registry
+  imagePullPolicy: Always
+  storageClass: local-path  # k3s default
+
+ingress:
+  storeDomain: shop.example.com        # Replace with your real domain
+  dashboardDomain: gateway.example.com # Replace with your real domain
+  tls: true
+  tlsSecretStore: store-tls
+  tlsSecretDashboard: dashboard-tls
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+woocommerce:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+  persistence:
+    size: 20Gi
+
+mariadb:
+  persistence:
+    size: 20Gi
+
+postgresql:
+  persistence:
+    size: 10Gi
+
+gatewayBackend:
+  replicaCount: 2  # HA in prod
+
+# Production secrets — use sealed-secrets or external-secrets-operator
+# Do NOT hardcode real secrets here; use --set flags or secrets management
+secrets:
+  mariadbRootPassword: "OVERRIDE_ME"
+  mariadbUserPassword: "OVERRIDE_ME"
+  postgresPassword: "OVERRIDE_ME"
+  jwtSecret: "OVERRIDE_ME_MIN_32_CHARS_RANDOM_STRING"
+  adminPassword: "OVERRIDE_ME"
+  wcConsumerKey: "OVERRIDE_ME"
+  wcConsumerSecret: "OVERRIDE_ME"
+  geminiApiKey: "OVERRIDE_ME"

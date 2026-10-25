@@ -1,0 +1,199 @@
+# Urumi — Default Helm Values
+# Override with values-local.yaml (Kind) or values-prod.yaml (k3s)
+
+global:
+  imageRegistry: ""      # "" for local images; "registry.example.com" for prod
+  imagePullPolicy: IfNotPresent
+  storageClass: ""       # "" = default storage class
+
+# ─────────────────── Ingress ────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  # nip.io wildcard approach for local; real domains for prod
+  storeDomain: store.127.0.0.1.nip.io
+  dashboardDomain: dashboard.127.0.0.1.nip.io
+  tls: false             # set true for prod + cert-manager
+  tlsSecretStore: ""
+  tlsSecretDashboard: ""
+  annotations: {}
+
+# ─────────────────── WooCommerce / WordPress ────────────────────────
+woocommerce:
+  enabled: true
+  image:
+    repository: wordpress
+    tag: "6.7-php8.2-apache"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  persistence:
+    size: 5Gi
+    storageClass: ""   # uses global.storageClass if empty
+  env:
+    tablePrefix: wp_
+    debugMode: "false"
+    adminEmail: admin@urumi.local
+  service:
+    port: 80
+
+# ─────────────────── MariaDB (WP database) ──────────────────────────
+mariadb:
+  enabled: true
+  image:
+    repository: mariadb
+    tag: "11.4"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  persistence:
+    size: 5Gi
+    storageClass: ""
+  auth:
+    database: wordpress
+    username: wordpress
+    # Passwords live in Kubernetes Secret: urumi-db-secret
+    # Keys: root-password, user-password
+
+# ─────────────────── PostgreSQL (gateway database) ──────────────────
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  persistence:
+    size: 2Gi
+    storageClass: ""
+  auth:
+    database: urumi
+    username: urumi
+    # Password in Secret: urumi-gateway-secret key: db-password
+
+# ─────────────────── WooCommerce MCP Server ─────────────────────────
+woocommerceMcp:
+  enabled: true
+  image:
+    repository: urumi/woocommerce-mcp
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  # NetworkPolicy: only gateway can reach this service
+
+# ─────────────────── Weather MCP Server ─────────────────────────────
+weatherMcp:
+  enabled: true
+  image:
+    repository: urumi/weather-mcp
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 3001
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ─────────────────── Calculator MCP Server ──────────────────────────
+calculatorMcp:
+  enabled: true
+  image:
+    repository: urumi/calculator-mcp
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 3002
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ─────────────────── Gateway Backend ────────────────────────────────
+gatewayBackend:
+  enabled: true
+  image:
+    repository: urumi/gateway-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 4000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  config:
+    upstreamTimeoutMs: "15000"
+    corsOrigin: "*"
+  # Gemini key in Secret: urumi-gemini-secret key: api-key
+  # JWT secret in Secret: urumi-gateway-secret key: jwt-secret
+
+# ─────────────────── Gateway Frontend ───────────────────────────────
+gatewayFrontend:
+  enabled: true
+  image:
+    repository: urumi/gateway-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
+
+# ─────────────────── Secrets (override in production) ───────────────
+# These are base64-decoded plaintext for local dev convenience.
+# In production, use external-secrets or sealed-secrets.
+secrets:
+  # DB
+  mariadbRootPassword: "root-changeme"
+  mariadbUserPassword: "wp-changeme"
+  # Gateway
+  postgresPassword: "pg-changeme"
+  jwtSecret: "jwt-dev-secret-change-in-prod-min-32-chars"
+  adminPassword: "changeme123"
+  # WooCommerce REST API (fill after WP install)
+  wcConsumerKey: ""
+  wcConsumerSecret: ""
+  # Gemini
+  geminiApiKey: ""

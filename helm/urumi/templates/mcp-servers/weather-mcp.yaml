@@ -1,0 +1,58 @@
+{{- if .Values.weatherMcp.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-mcp
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+    app: weather-mcp
+spec:
+  replicas: {{ .Values.weatherMcp.replicaCount }}
+  selector:
+    matchLabels:
+      app: weather-mcp
+  template:
+    metadata:
+      labels:
+        app: weather-mcp
+    spec:
+      containers:
+      - name: weather-mcp
+        image: {{ .Values.weatherMcp.image.repository }}:{{ .Values.weatherMcp.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.weatherMcp.port }}
+          name: mcp
+        env:
+        - name: PORT
+          value: {{ .Values.weatherMcp.port | quote }}
+        resources: {{- toYaml .Values.weatherMcp.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.weatherMcp.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.weatherMcp.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weather-mcp
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: weather-mcp
+  ports:
+  - port: {{ .Values.weatherMcp.port }}
+    targetPort: {{ .Values.weatherMcp.port }}
+    name: mcp
+{{- end }}

@@ -1,0 +1,94 @@
+{{- if .Values.mariadb.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-pvc
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with (coalesce .Values.mariadb.persistence.storageClass .Values.global.storageClass) }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.mariadb.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+    app: mariadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+      - name: mariadb
+        image: {{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: urumi-db-secret
+              key: root-password
+        - name: MYSQL_DATABASE
+          value: {{ .Values.mariadb.auth.database }}
+        - name: MYSQL_USER
+          value: {{ .Values.mariadb.auth.username }}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: urumi-db-secret
+              key: user-password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        resources: {{- toYaml .Values.mariadb.resources | nindent 10 }}
+        livenessProbe:
+          exec:
+            command: [sh, -c, "mariadb-admin ping -u root -p$MYSQL_ROOT_PASSWORD"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          exec:
+            command: [sh, -c, "mariadb -u $MYSQL_USER -p$MYSQL_PASSWORD -e 'SELECT 1'"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 10
+          failureThreshold: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mariadb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+  clusterIP: None  # Headless for direct pod connection
+{{- end }}

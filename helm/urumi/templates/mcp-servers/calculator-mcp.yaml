@@ -1,0 +1,58 @@
+{{- if .Values.calculatorMcp.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: calculator-mcp
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+    app: calculator-mcp
+spec:
+  replicas: {{ .Values.calculatorMcp.replicaCount }}
+  selector:
+    matchLabels:
+      app: calculator-mcp
+  template:
+    metadata:
+      labels:
+        app: calculator-mcp
+    spec:
+      containers:
+      - name: calculator-mcp
+        image: {{ .Values.calculatorMcp.image.repository }}:{{ .Values.calculatorMcp.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.calculatorMcp.port }}
+          name: mcp
+        env:
+        - name: PORT
+          value: {{ .Values.calculatorMcp.port | quote }}
+        resources: {{- toYaml .Values.calculatorMcp.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.calculatorMcp.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.calculatorMcp.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: calculator-mcp
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "urumi.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: calculator-mcp
+  ports:
+  - port: {{ .Values.calculatorMcp.port }}
+    targetPort: {{ .Values.calculatorMcp.port }}
+    name: mcp
+{{- end }}
